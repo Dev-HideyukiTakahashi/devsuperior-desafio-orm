@@ -71,3 +71,32 @@ public Page<ProductDTO> find(Pageable pageable) {
   - Haverá apenas 2 consultas no banco
   - A primeira para busca paginada
   - A segunda será o JOIN reaproveitando o cache das categorias, sem a necessidade de buscar novamente cada categoria
+ 
+---
+
+## Referência para problema @ManyToOne
+
+- Problema causado por uma busca de muitos para um
+
+- Exemplo `@ManyToOne Funcionario` e `@OneToMany Departamento`
+  - Um seed com 10 funcionários e 5 departamentos
+  - Ao realizar a busca da para retornar uma `List` com `repository.findAll()`
+  - O JPA faz 1 busca para todos funcionários
+  - E várias buscas de departamentos para associar o funcionário
+
+---
+
+#### Solução em JPQL
+
+- A cláusula "JOIN FETCH" do JPQL não funciona com `Page`
+- A solução para esse caso seria `countQuery`
+  - Dessa maneira o JPA sabe quantos elementos buscar
+
+```
+@Query("SELECT obj FROM Funcionario obj JOIN FETCH obj.departamento,
+    countQuery = "SELECT COUNT(obj) FROM Funcionario obj JOIN obj.department)
+
+Page<Funcionario> searchAll(Pageable pageable);
+
+```
+
