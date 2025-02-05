@@ -50,6 +50,13 @@ SELECT * FROM tb_product
 List<Product> findProductsCategories(List<Product> products)
 
 ```
+Alternativa:
+
+```
+@Query(value = "SELECT obj FROM Product obj JOIN FETCH obj.categories",
+	countQuery = "SELECT count(obj) FROM Product obj JOIN obj.categories")
+public List<Product> searchAll();
+```
 
 - Service
 
@@ -69,8 +76,8 @@ public Page<ProductDTO> find(Pageable pageable) {
 
 - Conclusão:
   - Haverá apenas 2 consultas no banco
-  - A primeira para busca paginada
-  - A segunda será o JOIN reaproveitando o cache das categorias, sem a necessidade de buscar novamente cada categoria
+  - A primeira para busca paginada do produto
+  - A segunda será o JOIN reaproveitando o cache das categorias com a busca no repository da 'List', sem a necessidade de buscar novamente cada categoria
  
 ---
 
