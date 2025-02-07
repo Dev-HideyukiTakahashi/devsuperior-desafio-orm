@@ -112,8 +112,8 @@ Page<Funcionario> searchAll(Pageable pageable);
 
 
 * application.properties
-* criar o arquivo 'create.sql' na raiz do projeto
-* o comando abaixo busca o seed no arquivo 'import.sql'
+* o comando cria o arquivo 'create.sql' na raiz do projeto
+* também cria o seed baseado no arquivo 'import.sql'
 * após aplicar comentar/apagar as linhas
 
 ```
