@@ -107,3 +107,19 @@ Page<Funcionario> searchAll(Pageable pageable);
 
 ```
 
+---
+## Referência para criar o SQL da aplicação e fazer o seed
+
+
+* application.properties
+* criar o arquivo 'create.sql' na raiz do projeto
+* o comando abaixo busca o seed no arquivo 'import.sql'
+* após aplicar comentar/apagar as linhas
+
+```
+#spring.jpa.properties.jakarta.persistence.schema-generation.create-source=metadata
+#spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create
+#spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=create.sql
+#spring.jpa.properties.hibernate.hbm2ddl.delimiter=;
+```
+
