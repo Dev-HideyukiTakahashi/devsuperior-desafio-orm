@@ -1,125 +1,157 @@
-## Referência para problema N+1 consultas
+## 🚨 **Problema N+1 Consultas**
 
-- Problema causado com busca paginada (`Pageable`) com uma classe associada
+### **Causa: Busca Paginada com Classe Associada**
 
-* Exemplo:
-  - Busca paginada de um produto com size=3
-  - Retorna os 3 produtos com as categorias associadas
-  - O Hibernate faz o "select" 1 vez para buscar o produto
-  - Porém a busca do Hibernate faz o "select" 3 vezes para buscar as categorias associadas
+**Exemplo:**
+- Busca paginada de produtos com 'requestParam:' `size=3`.
+- Retorna os 3 produtos com as categorias associadas.
+- O Hibernate faz:
+  - **1º select** para buscar os produtos.
+  - **3 select**s adicionais para buscar as categorias associadas.
 
-- No exemplo com as entidades `Product` e `Category` em `@ManyToMany`
+**Entidades:**
+- `Product` e `Category` com relacionamento `@ManyToMany`.
 
-* A cláusula "JOIN FETCH" do JPQL não funciona com `Page`
+**Problema:**  
+- Múltiplas consultas no banco de dados.
+- Obs: a cláusula `JOIN FETCH` do JPQL funciona com `Page` apenas se adicionar a propriedade `countQuery `.
 
----
+### **Consulta com SQL**
 
-#### Como ficaria a consulta com SQL
+- **Problema com `LIMIT`:**
+  - O `LIMIT` do SQL não funciona como esperado, pois ele busca as primeiras 5 linhas, podendo causar repetição de dados.
 
-- O `LIMIT` do SQL não funcionaria
-  - Pois o SQL busca as primeiras 5 linhas e não os 5 primeiros produtos
-  - Portanto pode haver repetição de produto
-    - Product / Category : ID:1 Computador / ID:1 Computer
-    - Product / Category : ID:1 Computador / ID:2 Electronics
+  ```sql
+  SELECT * FROM tb_product
+  	INNER JOIN tb_product_category ON tb_product.id = tb_product_category.product_id
+  	INNER JOIN tb_category ON tb_category.id = tb_product_category.category_id
+  LIMIT 0,5
+  ```
 
-```
-SELECT * FROM tb_product
-	INNER JOIN tb_product_category ON tb_product.id = tb_product_category.product_id
-	INNER JOIN tb_category ON tb_category.id = tb_product_category.category_id
-	LIMIT 0,5
-```
+- **Consulta buscando apenas os 5 primeiros IDs:**
 
-- Buscando apenas os 5 primeiros id
+  ```sql
+  SELECT * FROM tb_product
+  	INNER JOIN tb_product_category ON tb_product.id = tb_product_category.product_id
+  	INNER JOIN tb_category ON tb_category.id = tb_product_category.category_id
+  WHERE tb_product.id IN (1,2,3,4,5)
+  ```
 
-```
-SELECT * FROM tb_product
-	INNER JOIN tb_product_category ON tb_product.id = tb_product_category.product_id
-	INNER JOIN tb_category ON tb_category.id = tb_product_category.category_id
-	WHERE tb_product.id IN (1,2,3,4,5)
-```
+### **Consulta com JPQL**
 
----
+#### **Repository**
 
-#### Como ficaria a consulta com JPQL
-
-- Repository
-
-```
+```java
 @Query("SELECT obj FROM Product obj JOIN FETCH obj.categories WHERE obj IN :products")
-
-List<Product> findProductsCategories(List<Product> products)
-
+List<Product> findProductsCategories(List<Product> products);
 ```
-Alternativa:
 
-```
+#### **Alternativa para Page**
+
+```java
 @Query(value = "SELECT obj FROM Product obj JOIN FETCH obj.categories",
-	countQuery = "SELECT count(obj) FROM Product obj JOIN obj.categories")
-public List<Product> searchAll();
+       countQuery = "SELECT count(obj) FROM Product obj JOIN obj.categories")
+public Page<Product> searchAll();
 ```
 
-- Service
+#### **Service**
 
-```
+```java
 public Page<ProductDTO> find(Pageable pageable) {
-
-  // Fazendo a consulta paginada com JPA
-  // Mantendo cache em memória das categories
+  // Realizando a consulta paginada com JPA
   Page<Product> page = repository.findAll(pageable);
 
-  // Convertendo a page em list para consulta customizada
+  // Convertendo a Page em List para consulta customizada
   repository.findProductsCategories(page.stream().toList());
 
   return page.map(x -> new ProductDTO(x));
 }
 ```
 
-- Conclusão:
-  - Haverá apenas 2 consultas no banco
-  - A primeira para busca paginada do produto
-  - A segunda será o JOIN reaproveitando o cache das categorias com a busca no repository da 'List', sem a necessidade de buscar novamente cada categoria
- 
----
-
-## Referência para problema @ManyToOne
-
-- Problema causado por uma busca de muitos para um
-
-- Exemplo `@ManyToOne Funcionario` e `@OneToMany Departamento`
-  - Um seed com 10 funcionários e 5 departamentos
-  - Ao realizar a busca da para retornar uma `List` com `repository.findAll()`
-  - O JPA faz 1 busca para todos funcionários
-  - E várias buscas de departamentos para associar o funcionário
+#### **Conclusão:**
+- **Apenas duas consultas no banco**:
+  1. **Primeira**: Consulta paginada dos produtos.
+  2. **Segunda**: `JOIN` reaproveitando o cache das categorias, sem precisar buscar novamente as categorias.
 
 ---
 
-#### Solução em JPQL
+## 🔄 **Problema @ManyToOne**
 
-- A cláusula "JOIN FETCH" do JPQL não funciona com `Page`
-- A solução para esse caso seria `countQuery`
-  - Dessa maneira o JPA sabe quantos elementos buscar
+### **Causa: Busca de Relacionamento de Muitos para Um**
 
-```
-@Query("SELECT obj FROM Funcionario obj JOIN FETCH obj.departamento,
-    countQuery = "SELECT COUNT(obj) FROM Funcionario obj JOIN obj.department)
+**Exemplo:**  
+- Relacionamento `@ManyToOne` entre `Funcionario` e `Departamento`.
+- Com 10 funcionários e 5 departamentos, o JPA faz:
+  - **1 consulta** para buscar todos os funcionários.
+  - **Várias consultas** para buscar os departamentos e associá-los a cada funcionário.
 
+### **Solução com JPQL**
+
+**Problema:**  
+A cláusula `JOIN FETCH` do JPQL não funciona bem com `Page`.
+
+**Solução:**  
+Usar `countQuery` para garantir que o JPA saiba quantos elementos buscar.
+
+```java
+@Query("SELECT obj FROM Funcionario obj JOIN FETCH obj.departamento",
+       countQuery = "SELECT COUNT(obj) FROM Funcionario obj JOIN obj.departamento")
 Page<Funcionario> searchAll(Pageable pageable);
-
 ```
 
 ---
-## Referência para criar o SQL da aplicação e fazer o seed
 
+## 🔍 **Problema com Query JPQL customizada buscando uma lista como parâmetro**
 
-* application.properties
-* o comando cria o arquivo 'create.sql' na raiz do projeto
-* também cria o seed baseado no arquivo 'import.sql'
-* após aplicar comentar/apagar as linhas
+### **Service**
 
+```java
+@Transactional(readOnly = true)
+public Page<ProductProjection> searchAll(String name, String categoryId, Pageable pageable) {
+  List<Long> categoryList = List.of();
+  if (!categoryId.equals("0")) {
+    // Populando a lista com os ids dos parâmetros
+    categoryList = Arrays.stream(categoryId.split(",")).map(Long::parseLong).toList();
+    // Ignorando a condição jpql WHERE (:categoryId = '0')
+    categoryId = "9999";
+  }
+  return productRepository.searchAll(name, categoryList, categoryId, pageable);
+}
 ```
-#spring.jpa.properties.jakarta.persistence.schema-generation.create-source=metadata
-#spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create
-#spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=create.sql
-#spring.jpa.properties.hibernate.hbm2ddl.delimiter=;
+
+### **Repository**
+
+* Obs: o JPQL não aceita EMPTY e NULL para lista, portanto foi reaproveitado o parâmetro que veio do client para testar a condicional
+
+```java
+@Query(value = """
+       SELECT obj FROM Product obj JOIN FETCH obj.categories c
+       WHERE (:categoryId = '0' OR c.id IN :categoryList)
+       AND (LOWER(obj.name) LIKE LOWER(CONCAT('%', :name, '%')))
+       ORDER BY obj.name""",
+    countQuery = """
+       SELECT COUNT(obj) FROM Product obj JOIN obj.categories c
+       WHERE (:categoryId = '0' OR c.id IN :categoryList)
+       AND (LOWER(obj.name) LIKE LOWER(CONCAT('%', :name, '%')))""")
+Page<ProductProjection> searchAll(String name, List<Long> categoryList, String categoryId,
+                                  Pageable pageable);
 ```
+
+---
+
+## 🛠️ **Gerar SQL e Realizar o Seed**
+
+### **Configuração no `application.properties`**
+
+* Adicione as seguintes propriedades para gerar o arquivo SQL de criação do banco e aplicar o seed.
+* Após a execução, comente ou apague essas linhas:
+
+```properties
+# spring.jpa.properties.jakarta.persistence.schema-generation.create-source=metadata
+# spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create
+# spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=create.sql
+# spring.jpa.properties.hibernate.hbm2ddl.delimiter=;
+```
+
+---
 
