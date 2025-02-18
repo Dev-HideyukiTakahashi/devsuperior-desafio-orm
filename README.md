@@ -104,6 +104,7 @@ Page<Funcionario> searchAll(Pageable pageable);
 ## 🔍 **Problema com Query JPQL customizada buscando uma lista como parâmetro**
 
 ### **Service**
+* Exemplo da request: /products?page=0&size=12&name=ma&categoryId=1,3
 
 ```java
 @Transactional(readOnly = true)
