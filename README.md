@@ -47,6 +47,9 @@ List<Product> findProductsCategories(List<Product> products);
 ```
 
 #### **Alternativa para Page**
+  * O page não aceita JOIN FETCH da mesma forma que List
+  * Se o nome da tabela na entitidade/model foi alterado, pode ser necessário representar pelo nome alterado
+      * Nesse caso seria por exemplo : "tb_product" e não o nome concreto Product
 
 ```java
 @Query(value = "SELECT obj FROM Product obj JOIN FETCH obj.categories",
@@ -58,11 +61,8 @@ public Page<Product> searchAll();
 
 ```java
 public Page<ProductDTO> find(Pageable pageable) {
-  // Realizando a consulta paginada com JPA
-  Page<Product> page = repository.findAll(pageable);
-
-  // Convertendo a Page em List para consulta customizada
-  repository.findProductsCategories(page.stream().toList());
+  // Realizando a consulta paginada customizada com JPA
+  Page<Product> page = repository.searchAll(pageable);
 
   return page.map(x -> new ProductDTO(x));
 }
